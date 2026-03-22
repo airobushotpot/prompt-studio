@@ -13,6 +13,8 @@ import { cn } from "../lib/utils";
 import ImportExportPanel from "./ImportExportPanel";
 import TemplatePanel from "./TemplatePanel";
 
+const TAG_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"];
+
 export default function Sidebar() {
   const {
     folders,
@@ -21,6 +23,7 @@ export default function Sidebar() {
     selectedTagId,
     view,
     addFolder,
+    addTag,
     selectFolder,
     selectTag,
     setView,
@@ -29,6 +32,8 @@ export default function Sidebar() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [newFolderName, setNewFolderName] = useState("");
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [showNewTag, setShowNewTag] = useState(false);
 
   const toggleFolder = (id: string) => {
     setExpandedFolders((prev) => {
@@ -47,6 +52,15 @@ export default function Sidebar() {
       addFolder(newFolderName.trim());
       setNewFolderName("");
       setShowNewFolder(false);
+    }
+  };
+
+  const handleAddTag = () => {
+    if (newTagName.trim()) {
+      const color = TAG_COLORS[tags.length % TAG_COLORS.length];
+      addTag(newTagName.trim(), color);
+      setNewTagName("");
+      setShowNewTag(false);
     }
   };
 
@@ -171,11 +185,37 @@ export default function Sidebar() {
         <div className="my-3 border-t border-[var(--border)]" />
 
         {/* Tags section */}
-        <div className="px-3 py-1">
+        <div className="px-3 py-1 flex items-center justify-between">
           <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
             标签
           </span>
+          <button
+            onClick={() => setShowNewTag(true)}
+            className="p-1 rounded hover:bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
         </div>
+
+        {showNewTag && (
+          <div className="px-2 py-1">
+            <input
+              autoFocus
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddTag();
+                if (e.key === "Escape") {
+                  setShowNewTag(false);
+                  setNewTagName("");
+                }
+              }}
+              onBlur={handleAddTag}
+              placeholder="标签名称..."
+              className="w-full px-2 py-1 text-sm rounded border border-[var(--accent)] bg-[var(--bg-primary)] text-[var(--text-primary)] outline-none"
+            />
+          </div>
+        )}
 
         {tags.map((tag) => (
           <button

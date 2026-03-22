@@ -102,8 +102,11 @@ export default function PromptEditor() {
     const content = editor.getHTML();
     setIsSaving(true);
     try {
-      // updatePrompt on backend will auto-create a version of the previous content
-      await updatePrompt(prompt.id, { content });
+      await updatePrompt(prompt.id, {
+        title: localTitle,
+        description: localDescription,
+        content,
+      });
       lastSavedContent.current = content;
     } finally {
       setIsSaving(false);
