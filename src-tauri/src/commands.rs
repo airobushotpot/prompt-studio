@@ -2,15 +2,15 @@ use crate::db::{self, Folder, Prompt, PromptVersion, Tag, Store};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-type AppState = Mutex<Store>;
+pub type AppState = Arc<Mutex<Store>>;
 
-fn now() -> String {
+pub fn now() -> String {
     Utc::now().to_rfc3339()
 }
 
-fn nanoid() -> String {
+pub fn nanoid() -> String {
     nanoid::generate(21)
 }
 
@@ -557,5 +557,5 @@ pub fn get_templates() -> Vec<TemplateCategory> {
 // -------------------- Init --------------------
 
 pub fn init_state(app: &AppHandle) -> AppState {
-    Mutex::new(db::load_store(app))
+    Arc::new(Mutex::new(db::load_store(app)))
 }

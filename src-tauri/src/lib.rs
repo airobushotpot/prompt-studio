@@ -1,5 +1,8 @@
+mod api;
 mod commands;
-mod db;
+pub mod db;
+
+use std::sync::Arc;
 
 use commands::{
     create_folder, create_prompt, create_tag, create_version, delete_folder,
@@ -15,7 +18,20 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            app.manage(init_state(&app.handle()));
+            let state: Arc<std::sync::Mutex<_>> = init_state(&app.handle());
+
+            // Spawn REST API server in background thread
+            let api_state = state.clone();
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime for API server");
+                rt.block_on(async move {
+                    if let Err(e) = api::run_api_server(api_state).await {
+                        eprintln!("REST API server error: {}", e);
+                    }
+                });
+            });
+
+            app.manage(state);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
