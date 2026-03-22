@@ -1,51 +1,63 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { usePromptStore } from "./stores/promptStore";
+import Sidebar from "./components/Sidebar";
+import TopBar from "./components/TopBar";
+import PromptList from "./components/PromptList";
+import PromptEditor from "./components/PromptEditor";
+import VariablePanel from "./components/VariablePanel";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+export default function App() {
+  const { isDarkMode, selectedPromptId, view } = usePromptStore();
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className={isDarkMode ? "dark" : ""}>
+      <div className="h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        {/* Top bar */}
+        <TopBar />
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        {/* Main content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
+          <Sidebar />
+
+          {/* Prompt list */}
+          <div className="w-80 flex-shrink-0 border-r border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden flex flex-col">
+            <div className="p-2 border-b border-[var(--border)]">
+              <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-1">
+                {view === "trash"
+                  ? "回收站"
+                  : view === "favorites"
+                  ? "收藏"
+                  : view === "recent"
+                  ? "最近"
+                  : "提示词列表"}
+              </h2>
+            </div>
+            <PromptList />
+          </div>
+
+          {/* Editor panel */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {selectedPromptId ? (
+              <>
+                <PromptEditor />
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center bg-[var(--bg-primary)]">
+                <div className="text-center text-[var(--text-secondary)]">
+                  <p className="text-sm">← 选择左侧提示词开始编辑</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Variable panel (only show when editing non-trash) */}
+          {selectedPromptId && view !== "trash" && (
+            <div className="w-80 flex-shrink-0 border-l border-[var(--border)] overflow-hidden flex flex-col">
+              <VariablePanel />
+            </div>
+          )}
+        </div>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    </div>
   );
 }
-
-export default App;
