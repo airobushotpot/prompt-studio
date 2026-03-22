@@ -30,4 +30,22 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  // Optimize chunking to reduce bundle size warnings
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          editor: [
+            "@tiptap/react",
+            "@tiptap/starter-kit",
+            "@tiptap/extension-highlight",
+          ],
+          state: ["zustand"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
+  },
 }));
