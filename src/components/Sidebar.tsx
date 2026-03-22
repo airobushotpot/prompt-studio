@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { usePromptStore } from "../stores/promptStore";
 import { cn } from "../lib/utils";
+import ImportExportPanel from "./ImportExportPanel";
+import TemplatePanel from "./TemplatePanel";
 
 export default function Sidebar() {
   const {
@@ -190,6 +192,12 @@ export default function Sidebar() {
             <span className="truncate">{tag.name}</span>
           </button>
         ))}
+
+        {/* Import/Export */}
+        <ImportExportPanel />
+
+        {/* Templates */}
+        <TemplatePanel />
       </nav>
     </aside>
   );

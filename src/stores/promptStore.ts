@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { Prompt, Folder, Tag } from "../types";
+import type { Prompt, Folder, Tag, PromptVersion } from "../types";
 import * as api from "../lib/tauri/api";
 
 interface PromptStore {
@@ -14,6 +14,8 @@ interface PromptStore {
   view: "all" | "favorites" | "recent" | "trash";
   isDarkMode: boolean;
   isLoading: boolean;
+  versions: PromptVersion[];
+  selectedVersionId: string | null;
 
   // Init
   initFromBackend: () => Promise<void>;
@@ -43,6 +45,11 @@ interface PromptStore {
   setView: (view: "all" | "favorites" | "recent" | "trash") => void;
   setSearchQuery: (query: string) => void;
   toggleDarkMode: () => void;
+
+  // Version
+  loadVersions: (promptId: string) => Promise<void>;
+  restoreVersion: (versionId: string) => Promise<void>;
+  selectVersion: (versionId: string | null) => void;
 }
 
 // Map camelCase from Tauri to snake_case in store
@@ -73,6 +80,8 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
   view: "all",
   isDarkMode: false,
   isLoading: false,
+  versions: [],
+  selectedVersionId: null,
 
   initFromBackend: async () => {
     set({ isLoading: true });
@@ -241,6 +250,37 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
   setView: (view) => set({ view, selectedFolderId: null, selectedTagId: null }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
+
+  // Version
+  loadVersions: async (promptId) => {
+    try {
+      const versions = await api.apiGetPromptVersions(promptId);
+      set({
+        versions: (versions || []).map((v: any) => ({
+          id: v.id,
+          prompt_id: v.promptId,
+          content: v.content,
+          created_at: typeof v.createdAt === "number" ? v.createdAt : new Date(v.createdAt).getTime(),
+        })),
+      });
+    } catch (e) {
+      console.error("Failed to load versions", e);
+    }
+  },
+
+  restoreVersion: async (versionId) => {
+    const version = get().versions.find((v) => v.id === versionId);
+    if (!version) return;
+    const restored = await api.apiRestoreVersion(versionId);
+    const p = fromBackend(restored);
+    set((state) => ({
+      prompts: state.prompts.map((pr) => (pr.id === p.id ? p : pr)),
+      selectedVersionId: null,
+      versions: [],
+    }));
+  },
+
+  selectVersion: (versionId) => set({ selectedVersionId: versionId }),
 }));
 
 // Selector helpers

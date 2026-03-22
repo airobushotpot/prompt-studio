@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Highlight from "@tiptap/extension-highlight";
 import { usePromptStore } from "../stores/promptStore";
 import { extractVariables } from "../lib/utils";
-import { Tags, AlertCircle } from "lucide-react";
+import { Tags, AlertCircle, Save, History } from "lucide-react";
+import VersionPanel from "./VersionPanel";
 
 export default function PromptEditor() {
   const {
@@ -13,6 +14,10 @@ export default function PromptEditor() {
     updatePrompt,
     tags,
   } = usePromptStore();
+
+  const [showVersions, setShowVersions] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const lastSavedContent = useRef<string>("");
 
   const prompt = prompts.find((p) => p.id === selectedPromptId);
 
@@ -27,10 +32,8 @@ export default function PromptEditor() {
       }),
     ],
     content: prompt?.content || "",
-    onUpdate: ({ editor }) => {
-      if (prompt) {
-        updatePrompt(prompt.id, { content: editor.getHTML() });
-      }
+    onUpdate: () => {
+      // Don't auto-save on every keystroke; user clicks Save explicitly
     },
   });
 
@@ -41,6 +44,7 @@ export default function PromptEditor() {
       if (currentContent !== prompt.content) {
         editor.commands.setContent(prompt.content || "");
       }
+      lastSavedContent.current = prompt.content || "";
     }
   }, [selectedPromptId, editor]);
 
@@ -69,6 +73,19 @@ export default function PromptEditor() {
       ? currentTags.filter((id) => id !== tagId)
       : [...currentTags, tagId];
     updatePrompt(prompt.id, { tags: newTags });
+  };
+
+  const handleSave = async () => {
+    if (!prompt || !editor) return;
+    const content = editor.getHTML();
+    setIsSaving(true);
+    try {
+      // updatePrompt on backend will auto-create a version of the previous content
+      await updatePrompt(prompt.id, { content });
+      lastSavedContent.current = content;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -135,6 +152,34 @@ export default function PromptEditor() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Action bar */}
+      <div className="px-4 py-3 border-t border-[var(--border)] flex items-center justify-end gap-2">
+        <button
+          onClick={() => setShowVersions(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+        >
+          <History className="w-4 h-4" />
+          历史
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded text-sm bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          <Save className="w-4 h-4" />
+          {isSaving ? "保存中..." : "保存"}
+        </button>
+      </div>
+
+      {/* Version panel */}
+      {showVersions && prompt && (
+        <VersionPanel
+          promptId={prompt.id}
+          currentContent={editor?.getHTML() || ""}
+          onClose={() => setShowVersions(false)}
+        />
       )}
 
       {/* TipTap editor styles */}

@@ -4,9 +4,10 @@ mod models;
 
 use commands::{
     create_folder, create_prompt, create_tag, create_version, delete_folder,
-    delete_prompt, delete_tag, get_prompt, get_prompt_versions, get_prompts,
-    get_folders, get_tags, init_state, rename_folder, restore_prompt,
-    soft_delete_prompt, toggle_favorite, update_prompt,
+    delete_prompt, delete_tag, export_all_data, export_prompt_markdown,
+    get_prompt, get_prompt_versions, get_prompts, get_folders, get_tags,
+    get_templates, import_data, init_state, rename_folder, restore_prompt,
+    restore_version, soft_delete_prompt, toggle_favorite, update_prompt,
 };
 use tauri::Manager;
 
@@ -35,6 +36,11 @@ pub fn run() {
             delete_tag,
             get_prompt_versions,
             create_version,
+            restore_version,
+            export_all_data,
+            import_data,
+            export_prompt_markdown,
+            get_templates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

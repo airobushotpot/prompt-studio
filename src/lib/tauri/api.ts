@@ -115,3 +115,35 @@ export const apiGetPromptVersions = (promptId: string) =>
 
 export const apiCreateVersion = (promptId: string, content: string) =>
   invoke<BackendVersion>("create_version", { promptId, content });
+
+// -------------------- Export/Import --------------------
+
+export const apiExportAllData = () => invoke<string>("export_all_data");
+
+export const apiImportData = (json: string) =>
+  invoke<boolean>("import_data", { json });
+
+export const apiExportPromptMarkdown = (id: string) =>
+  invoke<string>("export_prompt_markdown", { id });
+
+// -------------------- Templates --------------------
+
+interface PromptTemplate {
+  title: string;
+  content: string;
+  description: string;
+  tags: string[];
+  variables: string[];
+}
+
+interface TemplateCategory {
+  name: string;
+  icon: string;
+  templates: PromptTemplate[];
+}
+
+export const apiGetTemplates = () =>
+  invoke<TemplateCategory[]>("get_templates");
+
+export const apiRestoreVersion = (versionId: string) =>
+  invoke<BackendPrompt>("restore_version", { versionId });
