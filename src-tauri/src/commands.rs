@@ -1,7 +1,7 @@
 use crate::db::{self, Folder, Prompt, PromptVersion, Tag, Store};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 use std::sync::Mutex;
 
 type AppState = Mutex<Store>;

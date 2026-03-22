@@ -1,6 +1,5 @@
 mod commands;
 mod db;
-mod models;
 
 use commands::{
     create_folder, create_prompt, create_tag, create_version, delete_folder,
@@ -14,6 +13,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             app.manage(init_state(&app.handle()));
             Ok(())

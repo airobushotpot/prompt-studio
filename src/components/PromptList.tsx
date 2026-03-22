@@ -1,12 +1,17 @@
+import { useMemo } from "react";
 import { Star, Folder, Trash2, RotateCcw, Copy } from "lucide-react";
-import { usePromptStore, selectFilteredPrompts } from "../stores/promptStore";
+import { usePromptStore } from "../stores/promptStore";
 import { cn, formatDate } from "../lib/utils";
 
 export default function PromptList() {
   const {
+    prompts: allPrompts,
     tags,
     folders,
     selectedPromptId,
+    selectedFolderId,
+    selectedTagId,
+    searchQuery,
     selectPrompt,
     view,
     toggleFavorite,
@@ -16,7 +21,38 @@ export default function PromptList() {
     duplicatePrompt,
   } = usePromptStore();
 
-  const prompts = usePromptStore(selectFilteredPrompts);
+  const prompts = useMemo(() => {
+    let filtered = allPrompts;
+
+    if (view === "trash") {
+      filtered = filtered.filter((p) => p.is_deleted);
+    } else {
+      filtered = filtered.filter((p) => !p.is_deleted);
+      if (view === "favorites") {
+        filtered = filtered.filter((p) => p.is_favorite);
+      }
+    }
+
+    if (selectedFolderId) {
+      filtered = filtered.filter((p) => p.folder_id === selectedFolderId);
+    }
+
+    if (selectedTagId) {
+      filtered = filtered.filter((p) => p.tags.includes(selectedTagId));
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.title.toLowerCase().includes(query) ||
+          p.content.toLowerCase().includes(query) ||
+          p.description.toLowerCase().includes(query)
+      );
+    }
+
+    return [...filtered].sort((a, b) => b.updated_at - a.updated_at);
+  }, [allPrompts, view, selectedFolderId, selectedTagId, searchQuery]);
 
   const getTag = (tagId: string) => tags.find((t) => t.id === tagId);
   const getFolder = (folderId: string | null) =>

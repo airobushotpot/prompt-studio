@@ -45,9 +45,5 @@
     "shortDescription": "AI提示词管理工具",
     "longDescription": "可视化管理和编辑AI提示词的工具，支持变量高亮、模板、历史版本等功能"
   },
-  "plugins": {
-    "sql": {
-      "preload": ["sqlite:promptstudio.db"]
-    }
-  }
+  "plugins": {}
 }
