@@ -8,12 +8,23 @@ import VariablePanel from "./components/VariablePanel";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 
 export default function App() {
-  const { isDarkMode, selectedPromptId, view, initFromBackend } = usePromptStore();
-  const [showVariablePanel, setShowVariablePanel] = useState(true);
+  const { isDarkMode, selectedPromptId, prompts, view, initFromBackend } = usePromptStore();
+  const [showVariablePanel, setShowVariablePanel] = useState(false);
 
   useEffect(() => {
     initFromBackend();
   }, []);
+
+  // Auto-show variable panel only when content contains {{
+  const selectedPrompt = prompts.find((p) => p.id === selectedPromptId);
+  const hasVariables = selectedPrompt?.content?.includes("{{") ?? false;
+
+  // Reset and auto-open when entering a prompt with variables
+  useEffect(() => {
+    if (selectedPromptId && hasVariables) {
+      setShowVariablePanel(true);
+    }
+  }, [selectedPromptId, hasVariables]);
 
   return (
     <div className={isDarkMode ? "dark" : ""}>
@@ -55,15 +66,20 @@ export default function App() {
             )}
           </div>
 
-          {/* Variable panel toggle + panel */}
-          {selectedPromptId && view !== "trash" && (
+          {/* Variable panel toggle + panel — only show when content has {{
+ */}
+          {selectedPromptId && view !== "trash" && hasVariables && (
             <>
               <button
-                onClick={() => setShowVariablePanel(!showVariablePanel)}
+                onClick={() => setShowVariablePanel((v) => !v)}
                 className="self-start p-2 border-l border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
                 title={showVariablePanel ? "收起变量面板" : "展开变量面板"}
               >
-                {showVariablePanel ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                {showVariablePanel ? (
+                  <PanelRightClose className="w-4 h-4" />
+                ) : (
+                  <PanelRightOpen className="w-4 h-4" />
+                )}
               </button>
               {showVariablePanel && (
                 <div className="w-80 flex-shrink-0 border-l border-[var(--border)] overflow-hidden flex flex-col">
