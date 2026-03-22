@@ -5,21 +5,18 @@ mod models;
 use commands::{
     create_folder, create_prompt, create_tag, create_version, delete_folder,
     delete_prompt, delete_tag, get_prompt, get_prompt_versions, get_prompts,
-    get_folders, get_tags, rename_folder, restore_prompt, soft_delete_prompt,
-    toggle_favorite, update_prompt,
+    get_folders, get_tags, init_state, rename_folder, restore_prompt,
+    soft_delete_prompt, toggle_favorite, update_prompt,
 };
-use db::get_migrations;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let migrations = get_migrations();
-
     tauri::Builder::default()
-        .plugin(
-            tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:promptstudio.db", migrations)
-                .build(),
-        )
+        .setup(|app| {
+            app.manage(init_state(&app.handle()));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_prompts,
             get_prompt,

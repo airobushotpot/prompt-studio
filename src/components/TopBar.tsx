@@ -5,8 +5,8 @@ import SearchBar from "./SearchBar";
 export default function TopBar() {
   const { isDarkMode, toggleDarkMode, addPrompt, selectPrompt } = usePromptStore();
 
-  const handleNewPrompt = () => {
-    const id = addPrompt({
+  const handleNewPrompt = async () => {
+    const id = await addPrompt({
       title: "新建提示词",
       content: "",
       description: "",

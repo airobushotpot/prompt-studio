@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { nanoid } from "nanoid";
+
 import type { Prompt, Folder, Tag } from "../types";
+import * as api from "../lib/tauri/api";
 
 interface PromptStore {
   prompts: Prompt[];
@@ -12,24 +13,28 @@ interface PromptStore {
   searchQuery: string;
   view: "all" | "favorites" | "recent" | "trash";
   isDarkMode: boolean;
+  isLoading: boolean;
+
+  // Init
+  initFromBackend: () => Promise<void>;
 
   // Prompt CRUD
-  addPrompt: (prompt: Omit<Prompt, "id" | "created_at" | "updated_at">) => string;
-  updatePrompt: (id: string, updates: Partial<Prompt>) => void;
-  deletePrompt: (id: string) => void;
-  restorePrompt: (id: string) => void;
-  permanentlyDeletePrompt: (id: string) => void;
-  duplicatePrompt: (id: string) => string;
-  toggleFavorite: (id: string) => void;
+  addPrompt: (prompt: Omit<Prompt, "id" | "created_at" | "updated_at">) => Promise<string>;
+  updatePrompt: (id: string, updates: Partial<Prompt>) => Promise<void>;
+  deletePrompt: (id: string) => Promise<void>;
+  restorePrompt: (id: string) => Promise<void>;
+  permanentlyDeletePrompt: (id: string) => Promise<void>;
+  duplicatePrompt: (id: string) => Promise<string>;
+  toggleFavorite: (id: string) => Promise<void>;
 
   // Folder CRUD
-  addFolder: (name: string, parent_id?: string | null) => string;
-  updateFolder: (id: string, updates: Partial<Folder>) => void;
-  deleteFolder: (id: string) => void;
+  addFolder: (name: string, parent_id?: string | null) => Promise<string>;
+  updateFolder: (id: string, updates: Partial<Folder>) => Promise<void>;
+  deleteFolder: (id: string) => Promise<void>;
 
   // Tag CRUD
-  addTag: (name: string, color: string) => string;
-  deleteTag: (id: string) => void;
+  addTag: (name: string, color: string) => Promise<string>;
+  deleteTag: (id: string) => Promise<void>;
 
   // Selection
   selectPrompt: (id: string | null) => void;
@@ -40,112 +45,88 @@ interface PromptStore {
   toggleDarkMode: () => void;
 }
 
-const now = Date.now();
+// Map camelCase from Tauri to snake_case in store
+function fromBackend(p: any): Prompt {
+  return {
+    id: p.id,
+    title: p.title,
+    content: p.content,
+    description: p.description,
+    folder_id: p.folderId,
+    tags: p.tags || [],
+    is_favorite: p.isFavorite || false,
+    is_deleted: p.isDeleted || false,
+    created_at: typeof p.createdAt === "number" ? p.createdAt : new Date(p.createdAt).getTime(),
+    updated_at: typeof p.updatedAt === "number" ? p.updatedAt : new Date(p.updatedAt).getTime(),
+  };
+}
 
-const mockFolders: Folder[] = [
-  { id: "folder-1", name: "工作", parent_id: null, created_at: now - 86400000 * 5 },
-  { id: "folder-2", name: "学习", parent_id: null, created_at: now - 86400000 * 3 },
-  { id: "folder-3", name: "创作", parent_id: null, created_at: now - 86400000 * 1 },
-];
-
-const mockTags: Tag[] = [
-  { id: "tag-1", name: "AI写作", color: "#3b82f6" },
-  { id: "tag-2", name: "代码", color: "#10b981" },
-  { id: "tag-3", name: "角色扮演", color: "#f59e0b" },
-  { id: "tag-4", name: "翻译", color: "#8b5cf6" },
-];
-
-const mockPrompts: Prompt[] = [
-  {
-    id: "prompt-1",
-    title: "代码审查助手",
-    content:
-      "你是一个专业的代码审查员。请审查下面的代码，找出潜在的问题和改进建议。\n\n语言：{{language}}\n\n代码：\n{{code}}\n\n请从以下几个方面进行审查：\n1. 代码质量和可读性\n2. 性能问题\n3. 安全漏洞\n4. 最佳实践",
-    description: "用于自动审查代码质量并提供改进建议的提示词",
-    folder_id: "folder-1",
-    tags: ["tag-2"],
-    is_favorite: true,
-    is_deleted: false,
-    created_at: now - 86400000 * 4,
-    updated_at: now - 86400000 * 2,
-  },
-  {
-    id: "prompt-2",
-    title: "专业翻译助手",
-    content:
-      "你是一个专业的翻译员。请将以下内容翻译成{{target_language}}。\n\n原文：\n{{text}}\n\n翻译要求：\n1. 保持原文风格和语气\n2. 准确传达原意\n3. 符合目标语言的表达习惯",
-    description: "多语言翻译提示词模板",
-    folder_id: "folder-2",
-    tags: ["tag-4"],
-    is_favorite: false,
-    is_deleted: false,
-    created_at: now - 86400000 * 3,
-    updated_at: now - 86400000 * 1,
-  },
-  {
-    id: "prompt-3",
-    title: "角色扮演导师",
-    content:
-      "请扮演一位{{role}}老师，用{{style}}的方式教授{{topic}}。\n\n学生背景：{{student_background}}\n\n请确保：\n1. 内容适合学生的水平\n2. 使用生动的例子\n3. 鼓励学生提问",
-    description: "用于教学的角色扮演提示词",
-    folder_id: "folder-3",
-    tags: ["tag-3", "tag-1"],
-    is_favorite: true,
-    is_deleted: false,
-    created_at: now - 86400000 * 2,
-    updated_at: now - 3600000,
-  },
-  {
-    id: "prompt-4",
-    title: "文章润色专家",
-    content:
-      "你是一位资深文字编辑。请帮我润色以下文章，使其更加流畅、专业。\n\n原文：\n{{article}}\n\n润色方向：{{direction}}",
-    description: "对文章进行语言润色和风格优化",
-    folder_id: "folder-3",
-    tags: ["tag-1"],
-    is_favorite: false,
-    is_deleted: false,
-    created_at: now - 86400000,
-    updated_at: now - 1800000,
-  },
-  {
-    id: "prompt-5",
-    title: "已删除的提示词",
-    content: "这是一条已删除的提示词示例",
-    description: "用于测试回收站功能",
-    folder_id: null,
-    tags: [],
-    is_favorite: false,
-    is_deleted: true,
-    created_at: now - 86400000 * 10,
-    updated_at: now - 86400000 * 6,
-  },
-];
 
 export const usePromptStore = create<PromptStore>((set, get) => ({
-  prompts: mockPrompts,
-  folders: mockFolders,
-  tags: mockTags,
-  selectedPromptId: "prompt-1",
+  prompts: [],
+  folders: [],
+  tags: [],
+  selectedPromptId: null,
   selectedFolderId: null,
   selectedTagId: null,
   searchQuery: "",
   view: "all",
   isDarkMode: false,
+  isLoading: false,
 
-  addPrompt: (prompt) => {
-    const id = nanoid();
-    const newPrompt: Prompt = {
-      ...prompt,
-      id,
-      created_at: Date.now(),
-      updated_at: Date.now(),
-    };
-    set((state) => ({ prompts: [...state.prompts, newPrompt] }));
-    return id;
+  initFromBackend: async () => {
+    set({ isLoading: true });
+    try {
+      const [prompts, folders, tags] = await Promise.all([
+        api.apiGetPrompts(),
+        api.apiGetFolders(),
+        api.apiGetTags(),
+      ]);
+      set({
+        prompts: prompts.map(fromBackend),
+        folders: (folders || []).map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          parent_id: f.parent_id,
+          created_at: typeof f.created_at === "number" ? f.created_at : new Date(f.created_at).getTime(),
+        })),
+        tags: (tags || []).map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          color: t.color,
+        })),
+        isLoading: false,
+      });
+    } catch (e) {
+      console.error("Failed to load from backend", e);
+      set({ isLoading: false });
+    }
   },
 
-  updatePrompt: (id, updates) => {
+  addPrompt: async (prompt) => {
+    const created = await api.apiCreatePrompt({
+      title: prompt.title,
+      content: prompt.content,
+      description: prompt.description,
+      folder_id: prompt.folder_id ?? null,
+      tags: prompt.tags,
+    });
+    const p = fromBackend(created);
+    set((state) => ({ prompts: [...state.prompts, p] }));
+    return p.id;
+  },
+
+  updatePrompt: async (id, updates) => {
+    const current = get().prompts.find((p) => p.id === id);
+    if (!current) return;
+    await api.apiUpdatePrompt({
+      id,
+      title: updates.title ?? current.title,
+      content: updates.content ?? current.content,
+      description: updates.description ?? current.description,
+      folder_id: updates.folder_id ?? current.folder_id ?? null,
+      tags: updates.tags ?? current.tags,
+    });
     set((state) => ({
       prompts: state.prompts.map((p) =>
         p.id === id ? { ...p, ...updates, updated_at: Date.now() } : p
@@ -153,7 +134,8 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
     }));
   },
 
-  deletePrompt: (id) => {
+  deletePrompt: async (id) => {
+    await api.apiSoftDeletePrompt(id);
     set((state) => ({
       prompts: state.prompts.map((p) =>
         p.id === id ? { ...p, is_deleted: true, updated_at: Date.now() } : p
@@ -161,7 +143,8 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
     }));
   },
 
-  restorePrompt: (id) => {
+  restorePrompt: async (id) => {
+    await api.apiRestorePrompt(id);
     set((state) => ({
       prompts: state.prompts.map((p) =>
         p.id === id ? { ...p, is_deleted: false, updated_at: Date.now() } : p
@@ -169,19 +152,18 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
     }));
   },
 
-  permanentlyDeletePrompt: (id) => {
+  permanentlyDeletePrompt: async (id) => {
+    await api.apiDeletePrompt(id);
     set((state) => ({
       prompts: state.prompts.filter((p) => p.id !== id),
-      selectedPromptId:
-        state.selectedPromptId === id ? null : state.selectedPromptId,
+      selectedPromptId: state.selectedPromptId === id ? null : state.selectedPromptId,
     }));
   },
 
-  duplicatePrompt: (id) => {
-    const { prompts, addPrompt } = get();
-    const original = prompts.find((p) => p.id === id);
+  duplicatePrompt: async (id) => {
+    const original = get().prompts.find((p) => p.id === id);
     if (!original) return "";
-    return addPrompt({
+    return get().addPrompt({
       title: `${original.title} (副本)`,
       content: original.content,
       description: original.description,
@@ -192,35 +174,40 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
     });
   },
 
-  toggleFavorite: (id) => {
+  toggleFavorite: async (id) => {
+    const current = get().prompts.find((p) => p.id === id);
+    if (!current) return;
+    await api.apiToggleFavorite(id);
     set((state) => ({
       prompts: state.prompts.map((p) =>
-        p.id === id
-          ? { ...p, is_favorite: !p.is_favorite, updated_at: Date.now() }
-          : p
+        p.id === id ? { ...p, is_favorite: !p.is_favorite, updated_at: Date.now() } : p
       ),
     }));
   },
 
-  addFolder: (name, parent_id = null) => {
-    const id = nanoid();
-    const newFolder: Folder = {
-      id,
-      name,
-      parent_id,
-      created_at: Date.now(),
+  addFolder: async (name, parent_id = null) => {
+    const created = await api.apiCreateFolder(name, parent_id ?? null);
+    const f: Folder = {
+      id: created.id,
+      name: created.name,
+      parent_id: created.parentId,
+      created_at: new Date(created.createdAt).getTime(),
     };
-    set((state) => ({ folders: [...state.folders, newFolder] }));
-    return id;
+    set((state) => ({ folders: [...state.folders, f] }));
+    return f.id;
   },
 
-  updateFolder: (id, updates) => {
+  updateFolder: async (id, updates) => {
+    if (updates.name) {
+      await api.apiRenameFolder(id, updates.name);
+    }
     set((state) => ({
       folders: state.folders.map((f) => (f.id === id ? { ...f, ...updates } : f)),
     }));
   },
 
-  deleteFolder: (id) => {
+  deleteFolder: async (id) => {
+    await api.apiDeleteFolder(id);
     set((state) => ({
       folders: state.folders.filter((f) => f.id !== id),
       prompts: state.prompts.map((p) =>
@@ -230,13 +217,15 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
     }));
   },
 
-  addTag: (name, color) => {
-    const id = nanoid();
-    set((state) => ({ tags: [...state.tags, { id, name, color }] }));
-    return id;
+  addTag: async (name, color) => {
+    const created = await api.apiCreateTag(name, color);
+    const t: Tag = { id: created.id, name: created.name, color: created.color };
+    set((state) => ({ tags: [...state.tags, t] }));
+    return t.id;
   },
 
-  deleteTag: (id) => {
+  deleteTag: async (id) => {
+    await api.apiDeleteTag(id);
     set((state) => ({
       tags: state.tags.filter((t) => t.id !== id),
       prompts: state.prompts.map((p) => ({
@@ -258,7 +247,6 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
 export const selectFilteredPrompts = (state: PromptStore): Prompt[] => {
   let filtered = state.prompts;
 
-  // Filter by view
   if (state.view === "trash") {
     filtered = filtered.filter((p) => p.is_deleted);
   } else {
@@ -268,17 +256,14 @@ export const selectFilteredPrompts = (state: PromptStore): Prompt[] => {
     }
   }
 
-  // Filter by folder
   if (state.selectedFolderId) {
     filtered = filtered.filter((p) => p.folder_id === state.selectedFolderId);
   }
 
-  // Filter by tag
   if (state.selectedTagId) {
     filtered = filtered.filter((p) => p.tags.includes(state.selectedTagId!));
   }
 
-  // Filter by search query
   if (state.searchQuery.trim()) {
     const query = state.searchQuery.toLowerCase();
     filtered = filtered.filter(
@@ -289,12 +274,6 @@ export const selectFilteredPrompts = (state: PromptStore): Prompt[] => {
     );
   }
 
-  // Sort: recent first (non-trash), trash by updated_at desc
-  if (state.view === "trash") {
-    filtered.sort((a, b) => b.updated_at - a.updated_at);
-  } else {
-    filtered.sort((a, b) => b.updated_at - a.updated_at);
-  }
-
+  filtered.sort((a, b) => b.updated_at - a.updated_at);
   return filtered;
 };

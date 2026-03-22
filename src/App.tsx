@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { usePromptStore } from "./stores/promptStore";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -6,7 +7,11 @@ import PromptEditor from "./components/PromptEditor";
 import VariablePanel from "./components/VariablePanel";
 
 export default function App() {
-  const { isDarkMode, selectedPromptId, view } = usePromptStore();
+  const { isDarkMode, selectedPromptId, view, initFromBackend } = usePromptStore();
+
+  useEffect(() => {
+    initFromBackend();
+  }, []);
 
   return (
     <div className={isDarkMode ? "dark" : ""}>
