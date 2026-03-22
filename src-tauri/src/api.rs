@@ -1,11 +1,30 @@
 use actix_web::{web, App, HttpResponse, HttpServer};
 use actix_cors::Cors;
 use serde::{Deserialize, Serialize};
+use tauri::AppHandle;
 
-use crate::db::{Folder, Prompt, PromptVersion, Tag, Store};
-use crate::commands::{AppState, now, nanoid};
+use crate::db::{self, Folder, Prompt, PromptVersion, Tag, Store};
+use crate::commands::{now, nanoid};
 
-type ApiState = web::Data<AppState>;
+type AppState = std::sync::Arc<std::sync::Mutex<Store>>;
+
+/// Inner combined state: holds both the store mutex and the Tauri AppHandle.
+#[derive(Clone)]
+struct ApiStateInner {
+    store: AppState,
+    app_handle: AppHandle,
+}
+
+impl std::ops::Deref for ApiStateInner {
+    type Target = AppState;
+    fn deref(&self) -> &Self::Target {
+        &self.store
+    }
+}
+
+/// Type alias so handler signatures can use `ApiState` directly (Actix extracts it via
+/// web::Data<ApiStateInner> -> FromRequest).
+type ApiState = web::Data<ApiStateInner>;
 
 // -------------------- Request/Response DTOs --------------------
 
@@ -142,6 +161,10 @@ async fn create_prompt(state: ApiState, body: web::Json<CreatePromptRequest>) ->
         s.prompts.push(prompt.clone());
         Ok(())
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(prompt))
 }
 
@@ -185,11 +208,16 @@ async fn update_prompt(
                 content: prev,
                 created_at: now(),
             };
-            let _ = with_store(&state, |s| {
+            with_store(&state, |s| {
                 s.versions.push(version);
                 Ok(())
-            });
+            })?;
         }
+    }
+
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
     }
 
     Ok(web::Json(result))
@@ -202,6 +230,10 @@ async fn delete_prompt(state: ApiState, path: web::Path<String>) -> ApiResult<bo
         s.versions.retain(|v| v.prompt_id != id);
         Ok(true)
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(true))
 }
 
@@ -217,6 +249,10 @@ async fn toggle_favorite(state: ApiState, path: web::Path<String>) -> ApiResult<
         prompt.updated_at = now();
         Ok(prompt.clone())
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(result))
 }
 
@@ -242,6 +278,10 @@ async fn create_folder(
         s.folders.push(folder.clone());
         Ok(())
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(folder))
 }
 
@@ -261,6 +301,10 @@ async fn rename_folder(
         folder.name = body.name;
         Ok(folder.clone())
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(result))
 }
 
@@ -276,6 +320,10 @@ async fn delete_folder(state: ApiState, path: web::Path<String>) -> ApiResult<bo
         s.folders.retain(|f| f.id != id);
         Ok(true)
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(true))
 }
 
@@ -297,6 +345,10 @@ async fn create_tag(state: ApiState, body: web::Json<CreateTagRequest>) -> ApiRe
         s.tags.push(tag.clone());
         Ok(())
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(tag))
 }
 
@@ -309,6 +361,10 @@ async fn delete_tag(state: ApiState, path: web::Path<String>) -> ApiResult<bool>
         s.tags.retain(|t| t.id != id);
         Ok(true)
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(true))
 }
 
@@ -347,6 +403,10 @@ async fn create_version(
         s.versions.push(version.clone());
         Ok(())
     })?;
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(version))
 }
 
@@ -372,6 +432,11 @@ async fn restore_version(state: ApiState, path: web::Path<String>) -> ApiResult<
         prompt.updated_at = now();
         Ok(prompt.clone())
     })?;
+
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
 
     Ok(web::Json(result))
 }
@@ -438,7 +503,10 @@ async fn import_data(state: ApiState, body: web::Json<ImportRequest>) -> ApiResu
         }
         Ok(())
     })?;
-
+    {
+        let store = state.lock().map_err(|e| internal_error(e.to_string()))?;
+        db::save_store(&state.get_ref().app_handle, &store).map_err(internal_error)?;
+    }
     Ok(web::Json(true))
 }
 
@@ -482,9 +550,13 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
 
 // -------------------- Run API Server --------------------
 
-pub async fn run_api_server(state: AppState) -> std::io::Result<()> {
+pub async fn run_api_server(state: AppState, app_handle: AppHandle) -> std::io::Result<()> {
     let bind_addr = "127.0.0.1:1847";
-    let state_data = web::Data::new(state);
+    let api_state_inner = ApiStateInner {
+        store: state,
+        app_handle: app_handle.clone(),
+    };
+    let state_data = web::Data::new(api_state_inner);
 
     println!("Starting REST API server at http://{}", bind_addr);
     println!("API endpoints available at /api/v1/*");

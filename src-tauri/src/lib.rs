@@ -1,6 +1,6 @@
 mod api;
 mod commands;
-pub mod db;
+pub mod db; // must be public so api.rs (Actix handlers) can call db::save_store
 
 use std::sync::Arc;
 
@@ -20,12 +20,16 @@ pub fn run() {
         .setup(|app| {
             let state: Arc<std::sync::Mutex<_>> = init_state(&app.handle());
 
-            // Spawn REST API server in background thread
+            // Spawn REST API server in a dedicated OS thread.
+            // Using std::thread::spawn (not tauri::async_runtime::spawn) because
+            // HttpServer::run() returns a future that contains non-Send types (Rc/RefCell
+            // from actix-web internals), which cannot cross thread boundaries.
             let api_state = state.clone();
+            let app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime for API server");
                 rt.block_on(async move {
-                    if let Err(e) = api::run_api_server(api_state).await {
+                    if let Err(e) = api::run_api_server(api_state, app_handle).await {
                         eprintln!("REST API server error: {}", e);
                     }
                 });
