@@ -17,9 +17,19 @@ export default function PromptEditor() {
 
   const [showVersions, setShowVersions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [localTitle, setLocalTitle] = useState("");
+  const [localDescription, setLocalDescription] = useState("");
   const lastSavedContent = useRef<string>("");
 
   const prompt = prompts.find((p) => p.id === selectedPromptId);
+
+  // Sync local state when switching prompts
+  useEffect(() => {
+    if (prompt) {
+      setLocalTitle(prompt.title);
+      setLocalDescription(prompt.description);
+    }
+  }, [selectedPromptId]);
 
   const editor = useEditor({
     extensions: [
@@ -60,11 +70,23 @@ export default function PromptEditor() {
   const variables = extractVariables(prompt.content);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    updatePrompt(prompt.id, { title: e.target.value });
+    setLocalTitle(e.target.value);
+  };
+
+  const handleTitleBlur = () => {
+    if (prompt && localTitle !== prompt.title) {
+      updatePrompt(prompt.id, { title: localTitle });
+    }
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    updatePrompt(prompt.id, { description: e.target.value });
+    setLocalDescription(e.target.value);
+  };
+
+  const handleDescriptionBlur = () => {
+    if (prompt && localDescription !== prompt.description) {
+      updatePrompt(prompt.id, { description: localDescription });
+    }
   };
 
   const handleTagToggle = (tagId: string) => {
@@ -94,14 +116,16 @@ export default function PromptEditor() {
       <div className="p-4 border-b border-[var(--border)]">
         <input
           type="text"
-          value={prompt.title}
+          value={localTitle}
           onChange={handleTitleChange}
+          onBlur={handleTitleBlur}
           placeholder="提示词标题..."
           className="w-full text-lg font-semibold bg-transparent text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
         />
         <textarea
-          value={prompt.description}
+          value={localDescription}
           onChange={handleDescriptionChange}
+          onBlur={handleDescriptionBlur}
           placeholder="简短描述..."
           rows={2}
           className="w-full mt-2 text-sm bg-transparent text-[var(--text-secondary)] outline-none resize-none placeholder:text-[var(--text-secondary)]"
