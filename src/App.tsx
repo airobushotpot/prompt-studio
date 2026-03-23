@@ -66,9 +66,8 @@ export default function App() {
             )}
           </div>
 
-          {/* Variable panel toggle + panel — only show when content has {{
- */}
-          {selectedPromptId && view !== "trash" && hasVariables && (
+          {/* Variable panel toggle + panel */}
+          {selectedPromptId && view !== "trash" && (
             <>
               <button
                 onClick={() => setShowVariablePanel((v) => !v)}

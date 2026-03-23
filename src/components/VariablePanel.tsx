@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Copy, Check, Eye, Wand2, ChevronDown } from "lucide-react";
+import { Copy, Check, Eye, Wand2, ChevronDown, ChevronUp } from "lucide-react";
 import { usePromptStore } from "../stores/promptStore";
 import { cn } from "../lib/utils";
 
@@ -237,9 +237,18 @@ export default function VariablePanel() {
         <div className="border-t border-[var(--border)] flex-shrink-0">
           <div className="px-4 py-2 bg-[var(--bg-secondary)] flex items-center justify-between">
             <p className="text-xs font-medium text-[var(--text-secondary)]">实时预览</p>
-            <span className="text-xs text-[var(--text-secondary)] opacity-50">
-              {previewContent.replace(/<[^>]+>/g, "").length} 字符
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[var(--text-secondary)] opacity-50">
+                {previewContent.replace(/<[^>]+>/g, "").length} 字符
+              </span>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="p-1 rounded hover:bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                title="收起预览"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div className="p-4 max-h-56 overflow-y-auto">
             {previewContent.trim() ? (

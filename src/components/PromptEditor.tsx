@@ -4,7 +4,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Highlight from "@tiptap/extension-highlight";
 import { usePromptStore } from "../stores/promptStore";
 import { extractVariables } from "../lib/utils";
-import { Tags, AlertCircle, Save, History } from "lucide-react";
+import { Tags, AlertCircle, Save, History, Plus } from "lucide-react";
 import VersionPanel from "./VersionPanel";
 
 export default function PromptEditor() {
@@ -12,10 +12,14 @@ export default function PromptEditor() {
     prompts,
     selectedPromptId,
     updatePrompt,
+    addTag,
     tags,
   } = usePromptStore();
 
   const [showVersions, setShowVersions] = useState(false);
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const newTagInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [localTitle, setLocalTitle] = useState("");
   const [localDescription, setLocalDescription] = useState("");
@@ -97,6 +101,32 @@ export default function PromptEditor() {
     updatePrompt(prompt.id, { tags: newTags });
   };
 
+  const handleAddTag = async () => {
+    const name = newTagName.trim();
+    if (!name || !prompt) return;
+    const tagId = await addTag(name, "#8b5cf6");
+    handleTagToggle(tagId);
+    setNewTagName("");
+    setIsAddingTag(false);
+  };
+
+  const handleAddTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddTag();
+    } else if (e.key === "Escape") {
+      setIsAddingTag(false);
+      setNewTagName("");
+    }
+  };
+
+  // Focus input when entering add mode
+  useEffect(() => {
+    if (isAddingTag && newTagInputRef.current) {
+      newTagInputRef.current.focus();
+    }
+  }, [isAddingTag]);
+
   const handleSave = async () => {
     if (!prompt || !editor) return;
     const content = editor.getHTML();
@@ -150,6 +180,29 @@ export default function PromptEditor() {
             {tag.name}
           </button>
         ))}
+        {isAddingTag ? (
+          <input
+            ref={newTagInputRef}
+            type="text"
+            value={newTagName}
+            onChange={(e) => setNewTagName(e.target.value)}
+            onKeyDown={handleAddTagKeyDown}
+            onBlur={() => {
+              setIsAddingTag(false);
+              setNewTagName("");
+            }}
+            placeholder="标签名..."
+            className="w-24 px-2 py-0.5 text-xs rounded border border-[var(--accent)] bg-[var(--bg-secondary)] text-[var(--text-primary)] outline-none"
+          />
+        ) : (
+          <button
+            onClick={() => setIsAddingTag(true)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border border-dashed border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            新增标签
+          </button>
+        )}
       </div>
 
       {/* Editor */}

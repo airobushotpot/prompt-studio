@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "可视化AI提示词管理工具"
 authors = ["airobushotpot"]
 edition = "2021"
+default-run = "prompt-studio"
 
 [lib]
 name = "prompt_studio_lib"

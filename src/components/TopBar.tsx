@@ -1,16 +1,21 @@
 import { useState, useRef, useEffect } from "react";
 import { Plus, Moon, Sun, X } from "lucide-react";
 import { usePromptStore } from "../stores/promptStore";
+import { cn } from "../lib/utils";
 import SearchBar from "./SearchBar";
 
 export default function TopBar() {
-  const { isDarkMode, toggleDarkMode, addPrompt, selectPrompt } = usePromptStore();
+  const { isDarkMode, toggleDarkMode, addPrompt, selectPrompt, tags, addTag } = usePromptStore();
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
   const [quickContent, setQuickContent] = useState("");
+  const [quickTags, setQuickTags] = useState<string[]>([]);
+  const [isAddingQuickTag, setIsAddingQuickTag] = useState(false);
+  const [newQuickTagName, setNewQuickTagName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const newTagInputRef = useRef<HTMLInputElement>(null);
 
   // Focus title input when modal opens
   useEffect(() => {
@@ -19,8 +24,43 @@ export default function TopBar() {
     } else {
       setQuickTitle("");
       setQuickContent("");
+      setQuickTags([]);
+      setIsAddingQuickTag(false);
+      setNewQuickTagName("");
     }
   }, [showQuickAdd]);
+
+  // Focus new tag input when entering add mode
+  useEffect(() => {
+    if (isAddingQuickTag && newTagInputRef.current) {
+      newTagInputRef.current.focus();
+    }
+  }, [isAddingQuickTag]);
+
+  const handleQuickTagToggle = (tagId: string) => {
+    setQuickTags((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+    );
+  };
+
+  const handleAddQuickTag = async () => {
+    const name = newQuickTagName.trim();
+    if (!name) return;
+    const tagId = await addTag(name, "#8b5cf6");
+    handleQuickTagToggle(tagId);
+    setNewQuickTagName("");
+    setIsAddingQuickTag(false);
+  };
+
+  const handleQuickTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddQuickTag();
+    } else if (e.key === "Escape") {
+      setIsAddingQuickTag(false);
+      setNewQuickTagName("");
+    }
+  };
 
   const handleQuickAdd = async () => {
     if (!quickTitle.trim()) return;
@@ -31,7 +71,7 @@ export default function TopBar() {
         content: quickContent,
         description: "",
         folder_id: null,
-        tags: [],
+        tags: quickTags,
         is_favorite: false,
         is_deleted: false,
       });
@@ -144,6 +184,51 @@ export default function TopBar() {
                   )}
                 />
               </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
+                  标签
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {tags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => handleQuickTagToggle(tag.id)}
+                      className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded text-xs text-white transition-opacity",
+                        quickTags.includes(tag.id) ? "opacity-100" : "opacity-40"
+                      )}
+                      style={{ backgroundColor: tag.color }}
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
+                  {isAddingQuickTag ? (
+                    <input
+                      ref={newTagInputRef}
+                      type="text"
+                      value={newQuickTagName}
+                      onChange={(e) => setNewQuickTagName(e.target.value)}
+                      onKeyDown={handleQuickTagKeyDown}
+                      onBlur={() => {
+                        setIsAddingQuickTag(false);
+                        setNewQuickTagName("");
+                      }}
+                      placeholder="标签名..."
+                      className="w-24 px-2 py-0.5 text-xs rounded border border-[var(--accent)] bg-[var(--bg-secondary)] text-[var(--text-primary)] outline-none"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setIsAddingQuickTag(true)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border border-dashed border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      新标签
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Footer */}
@@ -177,8 +262,4 @@ export default function TopBar() {
       )}
     </>
   );
-}
-
-function cn(...classes: (string | undefined | null | false)[]) {
-  return classes.filter(Boolean).join(" ");
 }
